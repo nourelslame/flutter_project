@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../admin/admin_home.dart';
 import '../teacher/teacher_home.dart';
 import '../student/student_home.dart';
+import '../../services/firebase_service.dart';
 
 class LoginSignupPage extends StatefulWidget {
   @override
@@ -318,6 +319,4 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
       }
     }
   }
-
-}
 }
