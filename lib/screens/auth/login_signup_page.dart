@@ -11,11 +11,8 @@ class LoginSignupPage extends StatefulWidget {
 
 class _LoginSignupPageState extends State<LoginSignupPage> {
   bool isLogin = true;
-  bool isLoading = false; // ← أضفناها هنا
   String selectedRole = 'Student';
   final _formKey = GlobalKey<FormState>();
-  
-  final FirebaseService _firebaseService = FirebaseService(); // ← أضفناها هنا
   
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -73,7 +70,6 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                         ),
                         SizedBox(height: 32),
                         
-                        // Login / Signup Tabs
                         Row(
                           children: [
                             Expanded(
@@ -117,7 +113,6 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                         ),
                         SizedBox(height: 24),
                         
-                        // Role Dropdown
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
@@ -156,7 +151,6 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                         ),
                         SizedBox(height: 24),
                         
-                        // Name Field (Sign Up only)
                         if (!isLogin) ...[
                           TextFormField(
                             controller: nameController,
@@ -176,7 +170,6 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           ),
                           SizedBox(height: 16),
                           
-                          // Student ID (Student only)
                           if (selectedRole == 'Student')
                             TextFormField(
                               controller: studentIdController,
@@ -197,10 +190,8 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           SizedBox(height: 16),
                         ],
                         
-                        // Email Field
                         TextFormField(
                           controller: emailController,
-                          keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'Email',
                             prefixIcon: Icon(Icons.email),
@@ -212,15 +203,11 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
                             }
-                            if (!value.contains('@')) {
-                              return 'Please enter a valid email';
-                            }
                             return null;
                           },
                         ),
                         SizedBox(height: 16),
                         
-                        // Password Field
                         TextFormField(
                           controller: passwordController,
                           obscureText: true,
@@ -235,19 +222,15 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
                             }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
                             return null;
                           },
                         ),
                         SizedBox(height: 24),
                         
-                        // Submit Button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: isLoading ? null : () {
+                            onPressed: () {
                               if (_formKey.currentState!.validate()) {
                                 _handleSubmit();
                               }
@@ -259,27 +242,17 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: isLoading
-                                ? SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    isLogin ? 'Login' : 'Sign Up',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                            child: Text(
+                              isLogin ? 'Login' : 'Sign Up',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                         
-                        // Info for Students
                         if (!isLogin && selectedRole == 'Student')
                           Padding(
                             padding: EdgeInsets.only(top: 16),
@@ -303,108 +276,47 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
     );
   }
 
-  Future<void> _handleSubmit() async {
+ void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    FirebaseService firebaseService = FirebaseService();
 
-    try {
-      if (isLogin) {
-        // تسجيل دخول
-        Map<String, dynamic> result = await _firebaseService.login(
-          emailController.text.trim(),
-          passwordController.text.trim(),
+    if (isLogin) {
+      bool worked = await firebaseService.login(
+        emailController.text,
+        passwordController.text,
+      );
+
+      if (worked) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => StudentHome()),
         );
-
-        setState(() {
-          isLoading = false;
-        });
-
-        if (result['success']) {
-          // التوجيه حسب الدور
-          _navigateToHome(result['role']);
-        } else {
-          _showMessage(result['message'], isError: true);
-        }
       } else {
-        // تسجيل جديد
-        Map<String, dynamic> result = await _firebaseService.register(
-          emailController.text.trim(),
-          passwordController.text.trim(),
-          nameController.text.trim(),
-          selectedRole.toLowerCase(),
-          studentId: selectedRole == 'Student' 
-              ? studentIdController.text.trim() 
-              : null,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Wrong email or password')),
         );
-
-        setState(() {
-          isLoading = false;
-        });
-
-        if (result['success']) {
-          _showMessage(result['message'], isError: false);
-
-          // التوجيه إذا لم يكن طالب
-          if (result['role'] != 'student') {
-            Future.delayed(Duration(seconds: 2), () {
-              _navigateToHome(result['role']);
-            });
-          } else {
-            // الطالب ينتظر الموافقة
-            setState(() {
-              isLogin = true;
-            });
-          }
-        } else {
-          _showMessage(result['message'], isError: true);
-        }
       }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      _showMessage('حدث خطأ: ${e.toString()}', isError: true);
-    }
-  }
-
-  // دالة التوجيه حسب الدور
-  void _navigateToHome(String role) {
-    Widget homePage;
-
-    if (role == 'admin') {
-      homePage = AdminHome();
-    } else if (role == 'teacher') {
-      homePage = TeacherHome();
     } else {
-      homePage = StudentHome();
+      bool worked = await firebaseService.register(
+        emailController.text,
+        passwordController.text,
+        nameController.text,
+        selectedRole.toLowerCase(),
+      );
+
+      if (worked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Account created...')),
+        );
+        setState(() {
+          isLogin = true;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed..')),
+        );
+      }
     }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => homePage),
-    );
-  }
-
-  // دالة عرض الرسائل
-  void _showMessage(String message, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: Duration(seconds: 3),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    nameController.dispose();
-    studentIdController.dispose();
-    super.dispose();
   }
 }
