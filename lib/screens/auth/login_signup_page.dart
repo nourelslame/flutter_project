@@ -275,35 +275,49 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
     );
   }
 
-  void _handleSubmit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isLogin 
-            ? 'Logging in as $selectedRole...' 
-            : 'Signing up as $selectedRole...',
-        ),
-        backgroundColor: Colors.green,
-      ),
-    );
-    
-    Future.delayed(Duration(seconds: 1), () {
-      if (selectedRole == 'Admin') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => AdminHome()),
-        );
-      } else if (selectedRole == 'Teacher') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => TeacherHome()),
-        );
-      } else {
+ void _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    FirebaseService firebaseService = FirebaseService();
+
+    if (isLogin) {
+      bool worked = await firebaseService.login(
+        emailController.text,
+        passwordController.text,
+      );
+
+      if (worked) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => StudentHome()),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Wrong email or password')),
+        );
       }
-    });
+    } else {
+      bool worked = await firebaseService.register(
+        emailController.text,
+        passwordController.text,
+        nameController.text,
+        selectedRole.toLowerCase(),
+      );
+
+      if (worked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Account created...')),
+        );
+        setState(() {
+          isLogin = true;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed..')),
+        );
+      }
+    }
   }
+
+}
 }
