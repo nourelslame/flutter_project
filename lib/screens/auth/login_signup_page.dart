@@ -13,7 +13,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
   bool isLogin = true;
   String selectedRole = 'Student';
   final _formKey = GlobalKey<FormState>();
-  
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
@@ -69,7 +69,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           ),
                         ),
                         SizedBox(height: 32),
-                        
+
                         Row(
                           children: [
                             Expanded(
@@ -80,8 +80,12 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: isLogin ? Colors.blue : Colors.grey.shade300,
-                                  foregroundColor: isLogin ? Colors.white : Colors.black,
+                                  backgroundColor: isLogin
+                                      ? Colors.blue
+                                      : Colors.grey.shade300,
+                                  foregroundColor: isLogin
+                                      ? Colors.white
+                                      : Colors.black,
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -99,8 +103,12 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: !isLogin ? Colors.blue : Colors.grey.shade300,
-                                  foregroundColor: !isLogin ? Colors.white : Colors.black,
+                                  backgroundColor: !isLogin
+                                      ? Colors.blue
+                                      : Colors.grey.shade300,
+                                  foregroundColor: !isLogin
+                                      ? Colors.white
+                                      : Colors.black,
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -112,9 +120,10 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           ],
                         ),
                         SizedBox(height: 24),
-                        
+
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(12),
@@ -123,23 +132,26 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             child: DropdownButton<String>(
                               value: selectedRole,
                               isExpanded: true,
-                              icon: Icon(Icons.arrow_drop_down, color: Colors.blue),
+                              icon: Icon(
+                                  Icons.arrow_drop_down, color: Colors.blue),
                               items: ['Admin', 'Teacher', 'Student']
-                                  .map((role) => DropdownMenuItem(
-                                        value: role,
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              role == 'Admin' ? Icons.admin_panel_settings :
-                                              role == 'Teacher' ? Icons.person :
-                                              Icons.school,
-                                              color: Colors.blue,
-                                            ),
-                                            SizedBox(width: 12),
-                                            Text(role),
-                                          ],
+                                  .map((role) =>
+                                  DropdownMenuItem(
+                                    value: role,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          role == 'Admin' ? Icons
+                                              .admin_panel_settings :
+                                          role == 'Teacher' ? Icons.person :
+                                          Icons.school,
+                                          color: Colors.blue,
                                         ),
-                                      ))
+                                        SizedBox(width: 12),
+                                        Text(role),
+                                      ],
+                                    ),
+                                  ))
                                   .toList(),
                               onChanged: (value) {
                                 setState(() {
@@ -150,7 +162,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           ),
                         ),
                         SizedBox(height: 24),
-                        
+
                         if (!isLogin) ...[
                           TextFormField(
                             controller: nameController,
@@ -169,7 +181,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             },
                           ),
                           SizedBox(height: 16),
-                          
+
                           if (selectedRole == 'Student')
                             TextFormField(
                               controller: studentIdController,
@@ -189,7 +201,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             ),
                           SizedBox(height: 16),
                         ],
-                        
+
                         TextFormField(
                           controller: emailController,
                           decoration: InputDecoration(
@@ -207,7 +219,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           },
                         ),
                         SizedBox(height: 16),
-                        
+
                         TextFormField(
                           controller: passwordController,
                           obscureText: true,
@@ -226,7 +238,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                           },
                         ),
                         SizedBox(height: 24),
-                        
+
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -252,7 +264,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
                             ),
                           ),
                         ),
-                        
+
                         if (!isLogin && selectedRole == 'Student')
                           Padding(
                             padding: EdgeInsets.only(top: 16),
@@ -276,7 +288,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
     );
   }
 
- void _handleSubmit() async {
+  void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
     FirebaseService firebaseService = FirebaseService();
@@ -288,10 +300,22 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
       );
 
       if (worked) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => StudentHome()),
-        );
+        if (selectedRole == 'Admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => AdminHome()),
+          );
+        } else if (selectedRole == 'Teacher') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => TeacherHome()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => StudentHome()),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Wrong email or password')),
