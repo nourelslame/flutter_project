@@ -1,0 +1,76 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class DatabaseService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Get current logged in user's data
+  Future<Map<String, dynamic>?> getCurrentUserData() async {
+    try {
+      // 1. Get current user ID
+      String? userId = _auth.currentUser?.uid;
+      if (userId == null) return null;
+
+      // 2. Get user document from Firestore
+      DocumentSnapshot snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      // 3. Return data if exists
+      if (snapshot.exists) {
+        return snapshot.data() as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print("Error getting user data: $e");
+      return null;
+    }
+  }
+
+  // Get all students (pending or approved)
+  Future<List<Map<String, dynamic>>> getStudents(bool approved) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .where('approved', isEqualTo: approved)
+          .get();
+
+      List<Map<String, dynamic>> students = [];
+
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id; // Add document ID
+        students.add(data);
+      }
+
+      return students;
+    } catch (e) {
+      print(e);
+      return [];
+    }
+  }
+
+  // Approve a student
+  Future<void> approveStudent(String userId, String group) async {
+    await _firestore.collection('users').doc(userId).update({
+      'approved': true,
+      'group': group,
+      'approvedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Update user profile
+  Future<void> updateProfile(Map<String, dynamic> updates) async {
+    try {
+      String? userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      await _firestore.collection('users').doc(userId).update(updates);
+    } catch (e) {
+      print("Error updating profile: $e");
+    }
+  }
+}
