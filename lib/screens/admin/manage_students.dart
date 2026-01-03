@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/database_service.dart';
 
 class ManageStudents extends StatefulWidget {
   @override
@@ -6,20 +7,42 @@ class ManageStudents extends StatefulWidget {
 }
 
 class _ManageStudentsState extends State<ManageStudents> {
-  List<Map<String, dynamic>> pendingStudents = [
-    {'name': 'Ahmed Benali', 'id': 'STU001', 'email': 'ahmed@example.com'},
-    {'name': 'Fatima Zohra', 'id': 'STU002', 'email': 'fatima@example.com'},
-    {'name': 'Karim Mahdi', 'id': 'STU003', 'email': 'karim@example.com'},
-  ];
+  DatabaseService _dbService = DatabaseService(); //
 
-  List<Map<String, dynamic>> approvedStudents = [
-    {'name': 'Sara Amira', 'id': 'STU101', 'email': 'sara@example.com', 'group': 'G1'},
-    {'name': 'Mohamed Ali', 'id': 'STU102', 'email': 'mohamed@example.com', 'group': 'G2'},
-    {'name': 'Yasmine Nour', 'id': 'STU103', 'email': 'yasmine@example.com', 'group': 'G1'},
-  ];
+  // use empty lists to fill from Firebase
+  List<Map<String, dynamic>> pendingStudents = [];
+  List<Map<String, dynamic>> approvedStudents = [];
+
+  bool isLoading = true;
+  String? selectedGroup; //store selected group in approval dialog
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents(); //
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    final pending = await _dbService.getStudents(false);
+    final approved = await _dbService.getStudents(true);
+
+    setState(() {
+      pendingStudents = pending;
+      approvedStudents = approved;
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -48,6 +71,10 @@ class _ManageStudentsState extends State<ManageStudents> {
   }
 
   Widget _buildPendingList() {
+    if (pendingStudents.isEmpty) {
+      return Center(child: Text('No pending students'));
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
       itemCount: pendingStudents.length,
@@ -67,11 +94,11 @@ class _ManageStudentsState extends State<ManageStudents> {
               children: [
                 IconButton(
                   icon: Icon(Icons.check, color: Colors.green),
-                  onPressed: () => _approveStudent(index),
+                  onPressed: () => _approveStudent(index), //
                 ),
                 IconButton(
                   icon: Icon(Icons.close, color: Colors.red),
-                  onPressed: () => _rejectStudent(index),
+                  onPressed: () => _rejectStudent(index), //
                 ),
               ],
             ),
@@ -82,6 +109,10 @@ class _ManageStudentsState extends State<ManageStudents> {
   }
 
   Widget _buildApprovedList() {
+    if (approvedStudents.isEmpty) {
+      return Center(child: Text('No approved students yet'));
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
       itemCount: approvedStudents.length,
@@ -95,7 +126,8 @@ class _ManageStudentsState extends State<ManageStudents> {
               backgroundColor: Colors.blue,
             ),
             title: Text(student['name']),
-            subtitle: Text('${student['id']} • Group: ${student['group']}'),
+            subtitle:
+            Text('${student['id']} • Group: ${student['group'] ?? 'Not set'}'),
             trailing: PopupMenuButton(
               itemBuilder: (context) => [
                 PopupMenuItem(child: Text('Edit Group'), value: 'edit'),
@@ -103,9 +135,9 @@ class _ManageStudentsState extends State<ManageStudents> {
               ],
               onSelected: (value) {
                 if (value == 'edit') {
-                  _showGroupDialog(index);
+                  _showGroupDialog(index); //
                 } else if (value == 'delete') {
-                  _deleteStudent(index);
+                  _deleteStudent(index); //
                 }
               },
             ),
@@ -116,65 +148,88 @@ class _ManageStudentsState extends State<ManageStudents> {
   }
 
   void _approveStudent(int index) {
+    final student = pendingStudents[index];
+    String? selectedGroup = 'G1'; // default value
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Assign Group'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Select a group for ${pendingStudents[index]['name']}'),
-            SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Group',
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Assign Group'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Select a group for ${student['name']}'),
+                  SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Group',
+                    ),
+                    items: ['G1', 'G2', 'G3', 'G4']
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedGroup = value;
+                      });
+                    },
+                  ),
+                ],
               ),
-              items: ['G1', 'G2', 'G3', 'G4']
-                  .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                  .toList(),
-              onChanged: (value) {},
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                pendingStudents.removeAt(index);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Student approved!')),
-              );
-            },
-            child: Text('Approve'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (selectedGroup == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please select a group first!')),
+                      );
+                      return;
+                    }
+
+                    await _dbService.approveStudent(student['id'], selectedGroup!);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${student['name']} approved!')),
+                    );
+                    await _loadStudents(); // Refresh lists after approval
+                  },
+                  child: Text('Approve'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
   void _rejectStudent(int index) {
+    final student = pendingStudents[index];
     setState(() {
-      pendingStudents.removeAt(index);
+      pendingStudents.removeAt(index); //
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Student rejected')),
+      SnackBar(content: Text('${student['name']} rejected')),
     );
   }
 
   void _showGroupDialog(int index) {
+    final student = approvedStudents[index];
+    String? newGroup = student['group'] ?? 'G1';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Change Group'),
         content: DropdownButtonFormField<String>(
-          value: approvedStudents[index]['group'],
+          value: newGroup,
           decoration: InputDecoration(
             border: OutlineInputBorder(),
             labelText: 'Group',
@@ -183,9 +238,7 @@ class _ManageStudentsState extends State<ManageStudents> {
               .map((g) => DropdownMenuItem(value: g, child: Text(g)))
               .toList(),
           onChanged: (value) {
-            setState(() {
-              approvedStudents[index]['group'] = value;
-            });
+            newGroup = value;
           },
         ),
         actions: [
@@ -194,7 +247,14 @@ class _ManageStudentsState extends State<ManageStudents> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              //  update student's group in Firebase
+              if (newGroup != null) {
+                await _dbService.approveStudent(student['id'], newGroup!);
+                await _loadStudents(); // refresh lists
+              }
+              Navigator.pop(context);
+            },
             child: Text('Save'),
           ),
         ],
@@ -203,11 +263,12 @@ class _ManageStudentsState extends State<ManageStudents> {
   }
 
   void _deleteStudent(int index) {
+    final student = approvedStudents[index];
     setState(() {
-      approvedStudents.removeAt(index);
+      approvedStudents.removeAt(index); //
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Student deleted')),
+      SnackBar(content: Text('${student['name']} deleted')),
     );
   }
 }
