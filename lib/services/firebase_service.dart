@@ -6,7 +6,7 @@ class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // ============================================
-  // تسجيل دخول
+  // Login
   // ============================================
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
@@ -17,7 +17,7 @@ class FirebaseService {
 
       String uid = userCredential.user!.uid;
 
-      // جلب بيانات المستخدم من Firestore
+      // Fetch user data from Firestore
       DocumentSnapshot userDoc = await _firestore
           .collection('users')
           .doc(uid)
@@ -27,18 +27,18 @@ class FirebaseService {
         await _auth.signOut();
         return {
           'success': false,
-          'message': 'حسابك غير مسجل في النظام'
+          'message': 'Your account is not registered in the system'
         };
       }
 
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
-      // التحقق من موافقة الطالب
+      // Check student approval
       if (userData['role'] == 'student' && userData['approved'] == false) {
         await _auth.signOut();
         return {
           'success': false,
-          'message': 'حسابك قيد المراجعة من قبل الإدارة'
+          'message': 'Your account is under review by administration'
         };
       }
 
@@ -49,13 +49,13 @@ class FirebaseService {
         'uid': uid,
       };
     } on FirebaseAuthException catch (e) {
-      String message = 'خطأ في تسجيل الدخول';
+      String message = 'Login error';
       if (e.code == 'user-not-found') {
-        message = 'البريد الإلكتروني غير مسجل';
+        message = 'Email not registered';
       } else if (e.code == 'wrong-password') {
-        message = 'كلمة المرور خاطئة';
+        message = 'Wrong password';
       } else if (e.code == 'invalid-email') {
-        message = 'البريد الإلكتروني غير صحيح';
+        message = 'Invalid email';
       }
       return {'success': false, 'message': message};
     } catch (e) {
@@ -64,7 +64,7 @@ class FirebaseService {
   }
 
   // ============================================
-  // تسجيل جديد
+  // Register
   // ============================================
   Future<Map<String, dynamic>> register(
     String email,
@@ -74,7 +74,7 @@ class FirebaseService {
     String? studentId,
   }) async {
     try {
-      // إنشاء حساب في Firebase Authentication
+      // Create account in Firebase Authentication
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
@@ -82,17 +82,17 @@ class FirebaseService {
 
       String uid = userCredential.user!.uid;
 
-      // إذا كان طالب
+      // If student
       if (role == 'student') {
         if (studentId == null || studentId.isEmpty) {
           await userCredential.user!.delete();
           return {
             'success': false,
-            'message': 'رقم التسجيل إجباري للطلاب'
+            'message': 'Student ID is required for students'
           };
         }
 
-        // إضافة في pendingStudents (انتظار موافقة Admin)
+        // Add to pendingStudents (waiting for Admin approval)
         await _firestore.collection('pendingStudents').doc(uid).set({
           'name': name.trim(),
           'email': email.trim(),
@@ -103,11 +103,11 @@ class FirebaseService {
         await _auth.signOut();
         return {
           'success': true,
-          'message': 'تم التسجيل! انتظر موافقة الإدارة',
+          'message': 'Registration completed! Wait for admin approval',
           'role': 'student'
         };
       } else {
-        // Admin أو Teacher - تسجيل مباشر
+        // Admin or Teacher - direct registration
         await _firestore.collection('users').doc(uid).set({
           'uid': uid,
           'email': email.trim(),
@@ -119,19 +119,19 @@ class FirebaseService {
 
         return {
           'success': true,
-          'message': 'تم التسجيل بنجاح!',
+          'message': 'Registration successful!',
           'role': role,
           'uid': uid,
         };
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'فشل التسجيل';
+      String message = 'Registration failed';
       if (e.code == 'weak-password') {
-        message = 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)';
+        message = 'Password is too weak (minimum 6 characters)';
       } else if (e.code == 'email-already-in-use') {
-        message = 'البريد الإلكتروني مستخدم بالفعل';
+        message = 'Email is already in use';
       } else if (e.code == 'invalid-email') {
-        message = 'البريد الإلكتروني غير صحيح';
+        message = 'Invalid email';
       }
       return {'success': false, 'message': message};
     } catch (e) {
@@ -140,19 +140,19 @@ class FirebaseService {
   }
 
   // ============================================
-  // تسجيل خروج
+  // Logout
   // ============================================
   Future<void> logout() async {
     await _auth.signOut();
   }
 
   // ============================================
-  // الحصول على المستخدم الحالي
+  // Get current user
   // ============================================
   User? get currentUser => _auth.currentUser;
 
   // ============================================
-  // جلب بيانات المستخدم الحالي
+  // Fetch current user data
   // ============================================
   Future<Map<String, dynamic>?> getCurrentUserData() async {
     if (currentUser == null) return null;
