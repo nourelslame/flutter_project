@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FirebaseService {
@@ -22,7 +23,7 @@ class FirebaseService {
         email: email,
         password: password,
       );
-      /*await FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
           .set({
@@ -33,7 +34,7 @@ class FirebaseService {
         'approved': role == 'student' ? false : true,
         'createdAt': FieldValue.serverTimestamp(),
       });
-*/
+
       return true;
     } catch (e) {
       print(e);
