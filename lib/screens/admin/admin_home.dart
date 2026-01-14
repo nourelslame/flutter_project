@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../screens/auth/login_signup_page.dart';
 import 'admin_dashboard.dart';
 import 'manage_students.dart';
 import 'manage_teachers.dart';
 import 'manage_schedules.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminHome extends StatefulWidget {
   @override
@@ -19,6 +21,22 @@ class _AdminHomeState extends State<AdminHome> {
     ManageSchedules(),
   ];
 
+  Future<void> _logout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => LoginSignupPage()),
+          (route) => false,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Logged out')),
+    );
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,9 +51,7 @@ class _AdminHomeState extends State<AdminHome> {
           ),
           IconButton(
             icon: Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+    onPressed: () => _logout(context),
           ),
         ],
       ),
