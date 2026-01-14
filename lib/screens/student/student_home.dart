@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../screens/auth/login_signup_page.dart';
 import 'student_dashboard.dart';
 import 'student_card.dart';
 import 'student_schedule.dart';
 import 'student_marks.dart';
 import 'student_courses.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StudentHome extends StatefulWidget {
   @override
@@ -20,6 +22,20 @@ class _StudentHomeState extends State<StudentHome> {
     StudentMarks(),
     StudentCourses(),
   ];
+
+  Future<void> _logout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => LoginSignupPage()),
+          (route) => false,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(' Logged out')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
