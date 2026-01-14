@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/database_service.dart';
 
 class TeacherAttendance extends StatefulWidget {
   @override
@@ -10,15 +11,57 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
   String selectedGroup = 'G1';
   String selectedWeek = 'Week 1';
 
-  List<Map<String, dynamic>> students = [
-    {'name': 'Ahmed Benali', 'id': 'STU001', 'present': true},
-    {'name': 'Sara Amira', 'id': 'STU101', 'present': true},
-    {'name': 'Mohamed Ali', 'id': 'STU102', 'present': false},
-    {'name': 'Yasmine Nour', 'id': 'STU103', 'present': true},
-  ];
+  // Changed: Now empty, will be filled from database
+  List<Map<String, dynamic>> students = [];
+
+  // ADDED: Database service and loading state
+  DatabaseService db = DatabaseService();
+  bool isLoading = true;
+  bool isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents(); // Load real students when screen opens
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() => isLoading = true);
+
+    try {
+      // Try to get REAL students from database
+      students = await db.getStudentsInGroup(selectedGroup);
+
+      // Initialize all as present by default
+      for (var student in students) {
+        student['present'] = true; // Default to present
+      }
+
+      setState(() => isLoading = false);
+      print("Loaded ${students.length} real students");
+    } catch (e) {
+      print("Database error: $e");
+
+      // FALLBACK: Use fake data if database fails
+      students = [
+        {'name': 'Ahmed Benali', 'id': 'STU001', 'present': true},
+        {'name': 'Sara Amira', 'id': 'STU101', 'present': true},
+        {'name': 'Mohamed Ali', 'id': 'STU102', 'present': false},
+        {'name': 'Yasmine Nour', 'id': 'STU103', 'present': true},
+      ];
+
+      setState(() => isLoading = false);
+      print("Using fake data (database error)");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while fetching data
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       children: [
         Container(
@@ -64,6 +107,7 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
                         setState(() {
                           selectedGroup = value!;
                         });
+                        _loadStudents(); // Reload students for new group
                       },
                     ),
                   ),
@@ -80,7 +124,7 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
                 ),
                 items: List.generate(
                   12,
-                  (i) => DropdownMenuItem(
+                      (i) => DropdownMenuItem(
                     value: 'Week ${i + 1}',
                     child: Text('Week ${i + 1}'),
                   ),
@@ -89,6 +133,7 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
                   setState(() {
                     selectedWeek = value!;
                   });
+                  // TODO: Load existing attendance for this week
                 },
               ),
             ],
@@ -129,7 +174,7 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
                         : Colors.red.shade100,
                   ),
                   title: Text(student['name']),
-                  subtitle: Text(student['id']),
+                  subtitle: Text(student['id'] ?? student['studentId'] ?? 'No ID'),
                   trailing: Switch(
                     value: student['present'],
                     onChanged: (value) {
@@ -149,19 +194,14 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Attendance saved for $selectedWeek'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
+              onPressed: isSaving ? null : _saveAttendance,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade700,
                 padding: EdgeInsets.symmetric(vertical: 16),
               ),
-              child: Text(
+              child: isSaving
+                  ? CircularProgressIndicator(color: Colors.white)
+                  : Text(
                 'Save Attendance',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
@@ -170,5 +210,51 @@ class _TeacherAttendanceState extends State<TeacherAttendance> {
         ),
       ],
     );
+  }
+
+  Future<void> _saveAttendance() async {
+    if (students.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No students to save')),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
+
+    try {
+      // Convert "Week 1" to number 1
+      int weekNumber = int.parse(selectedWeek.replaceAll('Week ', ''));
+
+      // Save each student's attendance
+      for (var student in students) {
+        await db.markAttendance(
+          courseId: selectedCourse,
+          groupId: selectedGroup,
+          studentId: student['id'] ?? 'unknown',
+          weekNumber: weekNumber,
+          present: student['present'] ?? true,
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Attendance saved for $selectedWeek'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      print("Saved attendance for ${students.length} students");
+    } catch (e) {
+      print("Save error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => isSaving = false);
+    }
   }
 }
