@@ -73,4 +73,239 @@ class DatabaseService {
       print("Error updating profile: $e");
     }
   }
+
+
+// Mark attendance for a student
+  Future<void> markAttendance({
+    required String courseId,
+    required String groupId,
+    required String studentId,
+    required int weekNumber,
+    required bool present,
+  }) async {
+    try {
+      await _firestore.collection('attendance').add({
+        'courseId': courseId,
+        'groupId': groupId,
+        'studentId': studentId,
+        'weekNumber': weekNumber,
+        'present': present,
+        'markedAt': FieldValue.serverTimestamp(),
+        'markedBy': _auth.currentUser?.uid,
+      });
+      print("Attendance marked for student $studentId");
+    } catch (e) {
+      print("Error marking attendance: $e");
+      rethrow;
+    }
+  }
+
+// 2. Mark attendance for multiple students (whole class)
+  Future<void> markClassAttendance({
+    required String courseId,
+    required String groupId,
+    required List<String> studentIds,
+    required int weekNumber,
+    required Map<String, bool> attendanceMap, // {studentId: true/false}
+  }) async {
+    try {
+      // Create a batch write (faster)
+      WriteBatch batch = _firestore.batch();
+
+      for (String studentId in studentIds) {
+        bool present = attendanceMap[studentId] ?? false;
+
+        var attendanceRef = _firestore.collection('attendance').doc();
+        batch.set(attendanceRef, {
+          'courseId': courseId,
+          'groupId': groupId,
+          'studentId': studentId,
+          'weekNumber': weekNumber,
+          'present': present,
+          'markedAt': FieldValue.serverTimestamp(),
+          'markedBy': _auth.currentUser?.uid,
+        });
+      }
+
+      await batch.commit();
+      print("Attendance marked for ${studentIds.length} students");
+    } catch (e) {
+      print("Error marking class attendance: $e");
+      rethrow;
+    }
+  }
+
+// Get attendance for a course/week
+  Future<List<Map<String, dynamic>>> getAttendance(
+      String courseId,
+      String groupId,
+      int weekNumber
+      ) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('attendance')
+          .where('courseId', isEqualTo: courseId)
+          .where('groupId', isEqualTo: groupId)
+          .where('weekNumber', isEqualTo: weekNumber)
+          .get();
+
+      List<Map<String, dynamic>> attendance = [];
+
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        attendance.add(data);
+      }
+
+      return attendance;
+    } catch (e) {
+      print("Error getting attendance: $e");
+      return [];
+    }
+  }
+
+// Get students in a group
+  Future<List<Map<String, dynamic>>> getStudentsInGroup(String groupId) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .where('group', isEqualTo: groupId)
+          .where('approved', isEqualTo: true)
+          .get();
+
+      List<Map<String, dynamic>> students = [];
+
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        students.add(data);
+      }
+
+      return students;
+    } catch (e) {
+      print("Error getting group students: $e");
+      return [];
+    }
+  }
+
+
+//  Add/Update a mark
+  Future<void> addMark({
+    required String studentId,
+    required String courseId,
+    required String markType,
+    required double score,
+    required double maxScore,
+  }) async {
+    try {
+      await _firestore.collection('marks').add({
+        'studentId': studentId,
+        'courseId': courseId,
+        'markType': markType,
+        'score': score,
+        'maxScore': maxScore,
+        'addedAt': FieldValue.serverTimestamp(),
+        'addedBy': _auth.currentUser?.uid,
+      });
+      print("Mark added for student $studentId");
+    } catch (e) {
+      print("Error adding mark: $e");
+      rethrow;
+    }
+  }
+
+//Get marks for a student in a course
+  Future<List<Map<String, dynamic>>> getStudentMarks(
+      String studentId,
+      String courseId
+      ) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('marks')
+          .where('studentId', isEqualTo: studentId)
+          .where('courseId', isEqualTo: courseId)
+          .orderBy('addedAt', descending: true)
+          .get();
+
+      List<Map<String, dynamic>> marks = [];
+
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        marks.add(data);
+      }
+
+      return marks;
+    } catch (e) {
+      print("Error getting marks: $e");
+      return [];
+    }
+  }
+  Future<List<Map<String, dynamic>>> getCourseMarks(
+      String courseId,
+      String groupId
+      ) async {
+    try {
+      // Get students in the group
+      List<Map<String, dynamic>> students =
+      await getStudentsInGroup(groupId);
+
+      // Get marks for each student
+      for (var student in students) {
+        List<Map<String, dynamic>> marks =
+        await getStudentMarks(student['id'], courseId);
+        student['marks'] = marks;
+      }
+
+      return students;
+    } catch (e) {
+      print("Error getting course marks: $e");
+      return [];
+    }
+  }
+
+// Calculate average for a student
+  double calculateAverage(List<Map<String, dynamic>> marks) {
+    if (marks.isEmpty) return 0.0;
+
+    double total = 0;
+    int count = 0;
+
+    for (var mark in marks) {
+      double score = (mark['score'] as num).toDouble();
+      double maxScore = (mark['maxScore'] as num).toDouble();
+
+      if (maxScore > 0) {
+        total += (score / maxScore) * 20; // Convert to /20
+        count++;
+      }
+    }
+
+    return count > 0 ? total / count : 0.0;
+  }
+
+  // Get schedule for a group
+  Future<List<Map<String, dynamic>>> getGroupSchedule(String groupId) async {
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('schedules')
+          .where('groupId', isEqualTo: groupId)
+          .orderBy('day')
+          .get();
+
+      List<Map<String, dynamic>> schedule = [];
+
+      for (var doc in snapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        schedule.add(data);
+      }
+
+      return schedule;
+    } catch (e) {
+      print("Error getting schedule: $e");
+      return [];
+    }
+  }
 }
